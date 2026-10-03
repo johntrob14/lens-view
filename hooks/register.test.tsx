@@ -44,7 +44,7 @@ const PROPS = {
   isFocused: true,
   bodyColumns: 80,
   placement: 'dock',
-  scroll: { offset: 0, bodyRows: 20 },
+  scroll: { offset: 0, bodyRows: 24 },
   view: {},
 } as const
 
@@ -78,7 +78,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await shows(pane, /j0\.11\.4/)
     await shows(pane, /j0\.11\.5/, false)
 
-    await pane.pointer({ type: 'down', x: 1, y: 1, button: 'left' }) // a click gives the region the keys
+    await pane.pointer({ type: 'down', x: 1, y: 0, button: 'left' }) // a click gives the region the keys
     await pane.key({ key: 'right' })
     await shows(pane, /▸ 1\/4\s+" Eiffel"/)
     await pane.key({ key: 'left' })
@@ -86,16 +86,16 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await shows(pane, /▸ 4\/4/)
 
     await pane.key({ key: '+' })
-    await shows(pane, /jlens · top 6/)
+    expect(await pane.find({ text: /jlens · top 6/ })).toBeDefined()
     await pane.key({ key: 'l' })
-    await shows(pane, /logitlens · top 6/)
+    expect(await pane.find({ text: /logitlens · top 6/ })).toBeDefined()
   })
 }
 
 test('a click on a token selects it', async ($, on) => {
   const pane = await opened($, on, 'terminal')
-  // Row 1 is the transcript's first line: "The Eiffel Tower is in"; x 5 is inside " Eiffel".
-  await pane.pointer({ type: 'down', x: 5, y: 1, button: 'left' })
+  // Row 0 is the transcript's first line: "The Eiffel Tower is in"; x 5 is inside " Eiffel".
+  await pane.pointer({ type: 'down', x: 5, y: 0, button: 'left' })
   await shows(pane, /▸ 1\/4/)
 })
 
@@ -103,21 +103,21 @@ test('k changes when asked, within what the trace stores', async ($, on) => {
   const pane = await opened($, on, 'terminal')
   const ran = await $.tool.call({ tool: 'mcp__lens-view__configure', k: 8 })
   expect(String(ran.result)).toContain('k = 8')
-  await shows(pane, /top 8/)
+  expect(await pane.find({ text: /top 8/ })).toBeDefined()
   await $.tool.call({ tool: 'mcp__lens-view__configure', k: 50 })
-  await shows(pane, /top 10/)
+  expect(await pane.find({ text: /top 10/ })).toBeDefined()
 })
 
 test('the wheel scrolls the half it is over', async ($, on) => {
   const pane = await opened($, on, 'terminal')
-  // 20 body rows: header, 11 transcript rows, the selection bar, 6 layer rows, the hint.
-  await shows(pane, /layers 6–11 of 12/)
+  // 24 body rows: the title bar, then the Client's 23: 14 transcript rows, the selection bar, 7 layer rows, the hint.
+  await shows(pane, /layers 5–11 of 12/)
   const wheel = (row: number, by: number) =>
-    $.ui.scroll({ component: 'Pane', requestId: 'lens-view', offset: 0, by, bodyRows: 20, contentRows: 20, origin: { kind: 'person' }, pointer: { column: 10, row } })
-  await wheel(15, -3)
-  await shows(pane, /layers 3–8 of 12/)
+    $.ui.scroll({ component: 'Pane', requestId: 'lens-view', offset: 0, by, bodyRows: 24, contentRows: 24, origin: { kind: 'person' }, pointer: { column: 10, row } })
+  await wheel(18, -3)
+  await shows(pane, /layers 2–8 of 12/)
   await wheel(3, -3) // over the transcript, which fits: nothing moves below
-  await shows(pane, /layers 3–8 of 12/)
+  await shows(pane, /layers 2–8 of 12/)
 })
 
 test('shows the parser error', async ($, on) => {

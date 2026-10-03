@@ -1,4 +1,4 @@
-// Draws the lens-view pane: a header, the transcript (top), the selected token's top-k per layer
+// Draws the lens-view pane below its title bar: the transcript (top), the selected token's top-k per layer
 // (bottom). Clicks and keys go to the hooks module as posts; the wheel arrives there as ui.scroll.
 import type { ClientModule } from 'claude-code'
 
@@ -29,8 +29,8 @@ const Viewer: ClientModule<LensViewProps> = (props, surface) => {
 
   surface.onPointer(event => {
     if (event.type !== 'down' || event.button !== 'left') return
-    const line = lines[event.y - 1]
-    if (event.y < 1 || event.y > topRows || !line) return
+    const line = lines[event.y]
+    if (event.y < 0 || event.y >= topRows || !line) return
     let x = 0
     for (const segment of line) {
       if (event.x < x + segment.text.length) return surface.post({ select: segment.pos })
@@ -69,10 +69,6 @@ const Viewer: ClientModule<LensViewProps> = (props, surface) => {
 
   return (
     <Box flexDirection="column" width={width}>
-      <Box flexDirection="row" height={1} justifyContent="space-between">
-        <Text color={INK.accent} bold wrap="truncate">{props.title}</Text>
-        <Text color={INK.dim} wrap="truncate">{props.status}</Text>
-      </Box>
       {transcript}
       <Box height={1} backgroundColor="#1f2335">
         <Text color={INK.text} bold wrap="truncate">{fit(props.selection, width)}</Text>

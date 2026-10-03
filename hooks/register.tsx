@@ -6,7 +6,7 @@ import { clamp, layout, shown } from './layout'
 
 const PANE = 'lens-view'
 const DEFAULT_K = 5
-const view = atom({ plugin: 'lens-view', key: 'view' } as const, {
+const DEFAULTS: LensViewState = {
   path: null,
   cache: null,
   meta: null,
@@ -17,11 +17,28 @@ const view = atom({ plugin: 'lens-view', key: 'view' } as const, {
   topOffset: 0,
   panelOffset: Number.MAX_SAFE_INTEGER, // start at the final layers
   cell: null,
-})
+}
+const view = atom({ plugin: 'lens-view', key: 'view' } as const, DEFAULTS)
+
+// The session keeps $.state across reloads, so a value an older version wrote may lack fields
+// this one reads: fill them from the defaults.
+function complete(v: Partial<LensViewState>): LensViewState {
+  const merged = { ...DEFAULTS, ...v }
+  for (const key of ['pos', 'k', 'lensIndex', 'topOffset', 'panelOffset'] as const)
+    if (!Number.isFinite(merged[key])) merged[key] = DEFAULTS[key]
+  return merged
+}
+
+const current = async ($: EngineInterface) => complete(await read($, view))
+const change = ($: EngineInterface, fn: (v: LensViewState) => LensViewState) => update($, view, v => fn(complete(v)))
 
 // The pane's geometry as last drawn: what the wheel and the keys move within. Recomputed on every
 // draw, so losing it on a reload costs nothing.
 let geometry = { topRows: 10, panelRows: 8, lineCount: 0, layerCount: 0, lineOf: [] as number[] }
+// What the pane last reported about itself, for the configure tool's answer.
+let seen = 'not drawn yet'
+// Rows to draw when the surface reports few (an inline pane grows to its content).
+const MIN_ROWS = 24
 
 // Python owns the trace formats: lens-view-json exports the trace to a cache directory of
 // meta.json and one pos-<i>.json per position, and the pane reads only what it shows.
@@ -41,7 +58,7 @@ async function load($: EngineInterface, path: string, options: { lens?: string; 
     error = `Could not load the trace (is uv installed?): ${String(exc)}`
   }
   const lensIndex = meta && options.lens ? Math.max(0, meta.lenses.findIndex(l => l.name === options.lens)) : 0
-  await update($, view, v => ({
+  await change($, v => ({
     ...v,
     path,
     cache,
@@ -61,14 +78,14 @@ async function load($: EngineInterface, path: string, options: { lens?: string; 
 }
 
 async function select($: EngineInterface, pos: number) {
-  const v = await read($, view)
+  const v = await current($)
   if (!v.meta || !v.cache) return
   const target = clamp(pos, 0, v.meta.tokens.length - 1)
   let cell: LensViewCell | null = null
   try {
     cell = JSON.parse(await $.fs.read(`${v.cache}/pos-${target}.json`)) as LensViewCell
   } catch (exc) {
-    await update($, view, s => ({ ...s, error: `Could not read position ${target}: ${String(exc)}` }))
+    await change($, s => ({ ...s, error: `Could not read position ${target}: ${String(exc)}` }))
     return
   }
   // Keep the selected token in view.
@@ -76,34 +93,34 @@ async function select($: EngineInterface, pos: number) {
   let topOffset = v.topOffset
   if (line < topOffset) topOffset = line
   if (line >= topOffset + geometry.topRows) topOffset = line - geometry.topRows + 1
-  await update($, view, s => ({ ...s, pos: target, cell, topOffset, error: null }))
+  await change($, s => ({ ...s, pos: target, cell, topOffset, error: null }))
 }
 
 async function configure($: EngineInterface, options: { k?: number; lens?: string; position?: number }) {
-  const v = await read($, view)
+  const v = await current($)
   const notes: string[] = []
   if (options.k !== undefined) {
     const k = clamp(Math.round(options.k), 1, v.meta?.k ?? 10)
-    await update($, view, s => ({ ...s, k }))
+    await change($, s => ({ ...s, k }))
     notes.push(`k = ${k}`)
   }
   if (options.lens !== undefined && v.meta) {
     const i = v.meta.lenses.findIndex(l => l.name === options.lens)
     if (i < 0) notes.push(`no lens "${options.lens}" (have ${v.meta.lenses.map(l => l.name).join(', ')})`)
     else {
-      await update($, view, s => ({ ...s, lensIndex: i }))
+      await change($, s => ({ ...s, lensIndex: i }))
       notes.push(`lens = ${options.lens}`)
     }
   }
   if (options.position !== undefined) {
     await select($, options.position)
-    notes.push(`position = ${(await read($, view)).pos}`)
+    notes.push(`position = ${(await current($)).pos}`)
   }
-  return notes.length ? `lens-view: ${notes.join(', ')}.` : 'Nothing to change.'
+  return `lens-view: ${notes.length ? notes.join(', ') : 'nothing changed'}. Pane: ${seen}; trace: ${v.path ?? 'none'}${v.error ? `; error: ${v.error}` : ''}.`
 }
 
 async function onKey($: EngineInterface, key: string) {
-  const v = await read($, view)
+  const v = await current($)
   if (!v.meta) return
   const last = v.meta.tokens.length - 1
   const lineStart = (line: number) => geometry.lineOf.findIndex(l => l === line)
@@ -133,7 +150,7 @@ async function onKey($: EngineInterface, key: string) {
       return configure($, { k: v.k - 1 })
     case 'l':
     case 'tab':
-      return update($, view, s => ({ ...s, lensIndex: s.meta ? (s.lensIndex + 1) % s.meta.lenses.length : 0 }))
+      return change($, s => ({ ...s, lensIndex: s.meta ? (s.lensIndex + 1) % s.meta.lenses.length : 0 }))
     case 'r':
       return v.path ? void (await load($, v.path, { lens: v.meta.lenses[v.lensIndex]?.name, k: v.k, position: v.pos })) : undefined
   }
@@ -141,17 +158,18 @@ async function onKey($: EngineInterface, key: string) {
 
 async function scrollPanel($: EngineInterface, by: number) {
   const max = Math.max(0, geometry.layerCount - geometry.panelRows)
-  await update($, view, s => ({ ...s, panelOffset: clamp(Math.min(s.panelOffset, max) + by, 0, max) }))
+  await change($, s => ({ ...s, panelOffset: clamp(Math.min(s.panelOffset, max) + by, 0, max) }))
 }
 
 async function scrollTranscript($: EngineInterface, by: number) {
   const max = Math.max(0, geometry.lineCount - geometry.topRows)
-  await update($, view, s => ({ ...s, topOffset: clamp(Math.min(s.topOffset, max) + by, 0, max) }))
+  await change($, s => ({ ...s, topOffset: clamp(Math.min(s.topOffset, max) + by, 0, max) }))
 }
 
+// bodyRows: the Client's rows (the title bar above it is the hook's own).
 function draw(v: LensViewState, width: number, bodyRows: number): LensViewProps {
-  const panelRows = Math.max(4, Math.floor((bodyRows - 3) * 0.38))
-  const topRows = Math.max(3, bodyRows - 3 - panelRows)
+  const panelRows = Math.max(4, Math.floor((bodyRows - 2) * 0.38))
+  const topRows = Math.max(3, bodyRows - 2 - panelRows)
   const hint = '←/→ token  ↑/↓ line  click select  wheel scroll  +/- k  l lens  r reload'
   if (!v.meta) {
     geometry = { topRows, panelRows, lineCount: 0, layerCount: 0, lineOf: [] }
@@ -256,7 +274,8 @@ export const register: Register = on => {
     if (word === 'k' && value) text = await configure($, { k: Number(value) })
     else if (word === 'lens' && value) text = await configure($, { lens: value })
     else if (word) text = await load($, e.args.trim())
-    await $.ui.open({ id: PANE, title: 'lens-view', focus: true })
+    const v = await current($)
+    await $.ui.open({ id: PANE, title: v.path ? `lens-view · ${v.path.split('/').pop()}` : 'lens-view', focus: true })
     return { text }
   })
 
@@ -287,7 +306,7 @@ export const register: Register = on => {
   // The pane draws exactly its body, so the engine has nothing of its own to scroll.
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const row = e.pointer?.row
-    if (row !== undefined && row > geometry.topRows + 1) await scrollPanel($, e.by)
+    if (row !== undefined && row > geometry.topRows + 1) await scrollPanel($, e.by) // title bar, transcript, selection bar
     else await scrollTranscript($, e.by)
     return {}
   })
@@ -300,14 +319,24 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const v = await read($, view)
+    const v = await current($)
     if (e.surface !== 'terminal' && e.surface !== 'desktop') {
       const { Text } = $.ui.resolve(e)
       return <Text>lens-view draws in the terminal and the desktop app. {v.path ?? ''}</Text>
     }
-    const { Client } = $.ui.resolve(e)
-    const width = e.props.bodyColumns
-    const rows = e.props.scroll.bodyRows
-    return <Client key="viewer" module="./viewer.tsx" props={draw(v, width, rows)} width={width} height={rows} />
+    const { Box, Text, Client } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns)
+    const rows = Math.max(MIN_ROWS, e.props.scroll.bodyRows)
+    seen = `${e.surface}, ${e.props.placement}, body ${e.props.bodyColumns}×${e.props.scroll.bodyRows}, drawn ${width}×${rows}`
+    const props = draw(v, width, rows - 1)
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" justifyContent="space-between" height={1}>
+          <Text color="#7aa2f7" bold wrap="truncate">{props.title}</Text>
+          <Text color="#565f89" wrap="truncate">{props.status}</Text>
+        </Box>
+        <Client key="viewer" module="./viewer.tsx" props={props} width={width} height={rows - 1} />
+      </Box>
+    )
   })
 }
