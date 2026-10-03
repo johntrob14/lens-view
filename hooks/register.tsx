@@ -75,9 +75,14 @@ export const register: Register = on => {
   on('tool.call', { tool: 'mcp__lens-view__open' }, async ($, e) => {
     const input = e.input as { path?: string; lens?: string }
     if (!input.path) return { deny: 'path is required.' }
-    const text = await load($, input.path, input.lens)
-    await $.ui.open({ id: PANE, title: 'lens-view' })
-    return { result: `${text} The pane shows it to the user; its contents were not returned to you.` }
+    try {
+      const text = await load($, input.path, input.lens)
+      // Not awaited: a pane opened unasked waits for a wide enough terminal (144 columns) to seat.
+      $.ui.open({ id: PANE, title: 'lens-view' }).catch(() => {})
+      return { result: `${text} The pane shows it to the user (it seats once the terminal is at least 144 columns wide, or when they run /lens-view); its contents were not returned to you.` }
+    } catch (exc) {
+      return { result: `lens-view failed: ${String(exc)}` }
+    }
   })
 
   // Placeholder drawing until the viewer is designed: final-layer top-1 per position.
