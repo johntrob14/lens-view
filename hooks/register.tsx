@@ -37,6 +37,7 @@ const change = ($: EngineInterface, fn: (v: LensViewState) => LensViewState) => 
 let geometry = { topRows: 10, panelRows: 8, lineCount: 0, layerCount: 0, lineOf: [] as number[] }
 // What the pane last reported about itself, for the configure tool's answer.
 let seen = 'not drawn yet'
+let wheel = { events: 0, last: 'none' }
 // Rows to draw when the surface reports few (an inline pane grows to its content).
 const MIN_ROWS = 24
 
@@ -116,7 +117,7 @@ async function configure($: EngineInterface, options: { k?: number; lens?: strin
     await select($, options.position)
     notes.push(`position = ${(await current($)).pos}`)
   }
-  return `lens-view: ${notes.length ? notes.join(', ') : 'nothing changed'}. Pane: ${seen}; trace: ${v.path ?? 'none'}${v.error ? `; error: ${v.error}` : ''}.`
+  return `lens-view: ${notes.length ? notes.join(', ') : 'nothing changed'}. Pane: ${seen}; wheel events: ${wheel.events} (last ${wheel.last}); trace: ${v.path ?? 'none'}${v.error ? `; error: ${v.error}` : ''}.`
 }
 
 async function onKey($: EngineInterface, key: string) {
@@ -306,6 +307,7 @@ export const register: Register = on => {
   // The pane draws exactly its body, so the engine has nothing of its own to scroll.
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const row = e.pointer?.row
+    wheel = { events: wheel.events + 1, last: `by ${e.by}, row ${row ?? 'none (keys)'}, origin ${e.origin.kind}` }
     if (row !== undefined && row > geometry.topRows + 1) await scrollPanel($, e.by) // title bar, transcript, selection bar
     else await scrollTranscript($, e.by)
     return {}
