@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "lens-view": {
+      "command": "uv",
+      "args": ["run", "--quiet", "--frozen", "--no-dev", "--project", "${PLUGIN_ROOT}", "lens-view-mcp"],
+      "env": { "UV_PROJECT_ENVIRONMENT": "${PLUGIN_DATA}/venv" }
+    }
+  }
+}

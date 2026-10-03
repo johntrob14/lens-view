@@ -1,0 +1,6 @@
+{
+  "name": "lens-view",
+  "owner": { "name": "John Robertson" },
+  "description": "lens-view: a terminal viewer for lens traces",
+  "plugins": [{ "name": "lens-view", "source": "./" }]
+}
