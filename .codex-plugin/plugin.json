@@ -2,7 +2,15 @@
   "name": "lens-view",
   "version": "0.1.0",
   "description": "Open lens traces (J-lens, logit lens) in a terminal viewer beside the agent, in tmux",
-  "author": { "name": "John Robertson" },
+  "author": {
+    "name": "John Robertson"
+  },
   "repository": "https://github.com/johntrob14/lens-view",
-  "keywords": ["interpretability", "jacobian-lens", "logit-lens", "tmux"]
+  "keywords": [
+    "interpretability",
+    "jacobian-lens",
+    "logit-lens",
+    "tmux"
+  ],
+  "license": "MIT"
 }

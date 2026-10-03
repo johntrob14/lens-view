@@ -3,6 +3,8 @@ name = "lens-view"
 version = "0.1.0"
 description = "Terminal viewer for lens traces (J-lens, logit lens, tuned lens), with an MCP server that opens it beside a coding agent in tmux"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = ["textual>=8.2", "mcp>=1.30,<2"]
 
