@@ -1,6 +1,6 @@
 {
   "name": "lens-view",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Open lens traces (J-lens, logit lens) in a terminal viewer beside the agent, in tmux",
   "author": {
     "name": "John Robertson"

@@ -73,7 +73,8 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: 'mcp__lens-view__open' }, async ($, e) => {
-    const input = e.input as { path?: string; lens?: string }
+    // The tool's arguments sit on the event itself, beside `tool`.
+    const input = e as unknown as { path?: string; lens?: string }
     if (!input.path) return { deny: 'path is required.' }
     try {
       const text = await load($, input.path, input.lens)

@@ -1,6 +1,6 @@
 [project]
 name = "lens-view"
-version = "0.1.1"
+version = "0.1.2"
 description = "Terminal viewer for lens traces (J-lens, logit lens, tuned lens), with an MCP server that opens it beside a coding agent in tmux"
 readme = "README.md"
 license = "MIT"

@@ -31,7 +31,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       return { value: { exitCode: 0, stdout: JSON.stringify(TRACE), stderr: '' } }
     })
     await $.session.start({ source: 'startup', cwd: '/t' })
-    const ran = await $.tool.call({ tool: 'mcp__lens-view__open', input: { path: '/t/trace.json', lens: 'logit' } })
+    const ran = await $.tool.call({ tool: 'mcp__lens-view__open', path: '/t/trace.json', lens: 'logit' })
     expect(argv).toContain('lens-view-json')
     expect(argv[argv.length - 1]).toBe('/t/trace.json')
     expect(String(ran.result)).toContain('2 tokens')
