@@ -20,7 +20,7 @@ const META = {
 // Position p, layer l: ten tokens named after both, the actual next token first at the last layer.
 function cell(p: number) {
   const row = (lens: string, l: number) =>
-    Array.from({ length: 10 }, (_, i) => [l === 11 && i === 0 ? (TOKENS[p + 1] ?? '?') : `${lens}${p}.${l}.${i}`, 0.5 / (i + 1)])
+    Array.from({ length: 10 }, (_, i) => [l === 11 && i === 0 ? (TOKENS[p + 1] ?? '?') : l === 11 && i === 1 ? '\x9b31m\x03' : `${lens}${p}.${l}.${i}`, 0.5 / (i + 1)])
   return { jlens: LAYERS.map((_, l) => row('j', l)), logitlens: LAYERS.map((_, l) => row('g', l)) }
 }
 
@@ -91,6 +91,12 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await pane.find({ text: /logitlens · top 6/ })).toBeDefined()
   })
 }
+
+test('control characters in tokens draw as escapes', async ($, on) => {
+  const pane = await opened($, on, 'terminal')
+  // C1 (here CSI) passes through JSON.stringify raw; the surface refuses a tree holding it.
+  await shows(pane, /\\x9b31m/)
+})
 
 test('a click on a token selects it', async ($, on) => {
   const pane = await opened($, on, 'terminal')

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { LensViewCell, LensViewMeta, LensViewProps, LensViewSegment, LensViewState } from '../types'
-import { clamp, layout, shown } from './layout'
+import { clamp, layout, quoted, shown } from './layout'
 
 const PANE = 'lens-view'
 const DEFAULT_K = 5
@@ -202,13 +202,13 @@ function draw(v: LensViewState, width: number, bodyRows: number): LensViewProps 
   const layers = v.cell?.[lens.name] ?? []
   const rows = lens.layers.slice(panelOffset, panelOffset + panelRows).map((label, i) => ({
     label,
-    chips: (layers[panelOffset + i] ?? []).slice(0, v.k).map(([text, prob]) => ({ text: JSON.stringify(text).slice(1, -1), prob, isNext: text === next })),
+    chips: (layers[panelOffset + i] ?? []).slice(0, v.k).map(([text, prob]) => ({ text: quoted(text), prob, isNext: text === next })),
   }))
   const chipWidth = Math.max(8, Math.floor((width - 5) / v.k))
   const nextProb = meta.next_prob[v.pos]
   const selection =
-    ` ▸ ${v.pos}/${meta.tokens.length - 1}  ${JSON.stringify(shown(meta.tokens[v.pos] ?? ''))}` +
-    (next !== null ? `  → next ${JSON.stringify(next)}${nextProb != null ? ` (${(nextProb * 100).toFixed(1)}% at output)` : ''}` : '') +
+    ` ▸ ${v.pos}/${meta.tokens.length - 1}  "${quoted(shown(meta.tokens[v.pos] ?? ''))}"` +
+    (next !== null ? `  → next "${quoted(next)}"${nextProb != null ? ` (${(nextProb * 100).toFixed(1)}% at output)` : ''}` : '') +
     `  ·  layers ${panelOffset}–${panelOffset + rows.length - 1} of ${lens.layers.length}`
   const name = meta.path.split('/').pop() ?? meta.path
   return {

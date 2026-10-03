@@ -2,10 +2,19 @@
 
 export type Piece = { text: string; pos: number }
 
-// How a token reads on screen: newlines and tabs made visible, empty tokens marked.
+// Control characters the surface refuses to draw: C0 (but newline, which layout breaks on), DEL and C1.
+const CONTROL = /[\x00-\x09\x0b-\x1f\x7f-\x9f]/g
+const hex = (c: string) => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`
+
+// How a token reads on screen: newlines and tabs made visible, other control characters escaped, empty tokens marked.
 export function shown(token: string): string {
   if (token === '') return '∅'
-  return token.replace(/\t/g, '⇥').replace(/\r/g, '␍')
+  return token.replace(/\t/g, '⇥').replace(/\r/g, '␍').replace(CONTROL, hex)
+}
+
+// A token as the body of a quoted string: JSON's escapes, plus DEL and C1, which JSON leaves raw.
+export function quoted(token: string): string {
+  return JSON.stringify(token).slice(1, -1).replace(/[\x7f-\x9f]/g, hex)
 }
 
 export function layout(tokens: string[], width: number): { lines: Piece[][]; lineOf: number[] } {
